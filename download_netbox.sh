@@ -11,7 +11,7 @@ patch -p1 <patches/settings.patch
 patch -p1 <patches/requirements.patch
 
 # Initiate Rockcraft 
-cp rockcraft.yaml netbox/rockcraft.yaml
+cp netbox_rockcraft.yaml netbox/rockcraft.yaml
 # Update the rockcraft.yaml with the correct version
 sed -i "s/^version: \".*\"/version: \"${NETBOX_VERSION}\"/" netbox/rockcraft.yaml
 

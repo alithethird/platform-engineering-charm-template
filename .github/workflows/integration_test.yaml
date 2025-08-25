@@ -4,6 +4,14 @@ on:
   pull_request:
 
 jobs:
+  setup-netbox:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Run download_netbox.sh
+        run: ./download_netbox.sh
+
   integration-tests:
     uses: canonical/operator-workflows/.github/workflows/integration_test.yaml@main
     secrets: inherit
@@ -17,5 +25,3 @@ jobs:
       rockcraft-channel: latest/edge
       charmcraft-channel: latest/edge
       charm-directory: "charm"
-      pre-run-script: |
-        -c "./download_netbox.sh"
