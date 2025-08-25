@@ -398,7 +398,7 @@ from typing import cast
 import jubilant
 from minio import Minio
 
-from charm.tests.integration.types import App
+from tests.integration.types import App
 
 
 @pytest.fixture(scope="session")
