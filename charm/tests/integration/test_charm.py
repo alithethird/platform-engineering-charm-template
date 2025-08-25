@@ -12,12 +12,12 @@ import requests
 from juju.application import Application
 from saml_test_helper import SamlK8sTestHelper
 
-from charm.tests.integration.types import App
 from tests.integration.helpers import (
     assert_return_true_with_retry,
     get_new_admin_token,
     get_unit_ips,
 )
+from tests.integration.types import App
 
 logger = logging.getLogger(__name__)
 
