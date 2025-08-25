@@ -4,24 +4,26 @@ on:
   pull_request:
 
 jobs:
-  setup-netbox:
+  integration-tests:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Run download_netbox.sh
         run: ./download_netbox.sh
+      # Add any other setup steps here
 
-  integration-tests:
-    uses: canonical/operator-workflows/.github/workflows/integration_test.yaml@main
-    secrets: inherit
-    with:
-      trivy-fs-enabled: true
-      trivy-image-config: "trivy.yaml"
-      self-hosted-runner: true
-      self-hosted-runner-label: "edge"
-      juju-channel: '3/stable'
-      channel: '1.32-strict/stable'
-      rockcraft-channel: latest/edge
-      charmcraft-channel: latest/edge
-      charm-directory: "charm"
+      # Now run your integration test workflow
+      - name: Run integration tests
+        uses: canonical/operator-workflows/.github/workflows/integration_test.yaml@main
+        with:
+          trivy-fs-enabled: true
+          trivy-image-config: "trivy.yaml"
+          self-hosted-runner: true
+          self-hosted-runner-label: "edge"
+          juju-channel: '3/stable'
+          channel: '1.32-strict/stable'
+          rockcraft-channel: latest/edge
+          charmcraft-channel: latest/edge
+          charm-directory: "charm"
+    # secrets: inherit
