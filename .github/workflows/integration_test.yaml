@@ -16,4 +16,4 @@ jobs:
       self-hosted-runner-label: "edge"
       juju-channel: '3/stable'
       channel: '1.32-strict/stable'
-      pre-build-script: 'download_netbox.sh'
+      pre-build-script: './download_netbox.sh'
