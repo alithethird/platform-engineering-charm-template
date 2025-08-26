@@ -47,7 +47,7 @@ def test_saml_integration(
             lambda status: jubilant.all_agents_idle(status, saml_integrator_app_name),
             timeout=600,
         )
-    saml_helper = SamlK8sTestHelper.deploy_saml_idp(model_name)# , kube_config="/var/snap/microk8s/current/credentials/client.config"
+    saml_helper = SamlK8sTestHelper.deploy_saml_idp(model_name, kube_config="/var/snap/microk8s/current/credentials/client.config")# , 
 
     saml_helper.prepare_pod(model_name, f"{saml_integrator_app_name}-0")
     saml_helper.prepare_pod(model_name, f"{netbox_nginx_integration.name}-0")

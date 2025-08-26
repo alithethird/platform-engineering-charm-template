@@ -51,6 +51,10 @@ def test_netbox_storage(
         .units[netbox_nginx_integration.name + "/0"]
         .address
     )
+    juju.wait(
+        jubilant.all_active,
+            timeout=600,
+    )
     base_url = f"http://{unit_ip}:8000"
     token = get_new_admin_token(juju, netbox_nginx_integration, base_url)
 
