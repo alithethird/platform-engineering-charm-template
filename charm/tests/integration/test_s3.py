@@ -7,50 +7,100 @@ import logging
 
 import jubilant
 import requests
+from minio import Minio
 
 from tests.integration.types import App
 
+
+import secrets
+import string
+
+import pytest
+
+from tests.integration.helpers import get_new_admin_token
+from tests.integration.types import App
 logger = logging.getLogger(__name__)
 
 
-def test_s3_integration(
-    netbox_app,
-    juju: jubilant.Juju,
+@pytest.mark.usefixtures("netbox_app")
+def test_netbox_storage(
+    netbox_nginx_integration: App,
+    s3_netbox_configuration: dict,
+    minio_app: App,
     s3_integrator_app: App,
-    s3_credentials,
-    s3_configuration,
-    http: requests.Session,
-):
+    s3_netbox_credentials: dict,
+    juju: jubilant.Juju,
+) -> None:
     """
-    arrange: after 12-Factor charm has been deployed.
-    act: establish relations established with loki charm.
-    assert: loki joins relation successfully, logs are being output to container and to files for
-        loki to scrape.
+    arrange: Build and deploy the NetBox charm.
+    act: Create a site and post an image
+    assert: The site is created and there is an extra object (the image)
+        in S3.
     """
-    juju.integrate(f"{netbox_app.name}:s3", f"{s3_integrator_app.name}:s3-credentials")
-
-    juju.wait(
-        lambda status: jubilant.all_active(status, netbox_app.name, s3_integrator_app.name),
-        timeout=600,
-        delay=3,
-    )
     status = juju.status()
-    unit_ip = status.apps[netbox_app.name].units[netbox_app.name + "/0"].address
+    minio_addr = status.apps[minio_app.name].units[minio_app.name + "/0"].address
 
-    response = http.get(f"http://{unit_ip}:8000/env", timeout=5)
-    assert response.status_code == 200
-    env = response.json()
+    boto_s3_client = Minio(
+        f"{minio_addr}:9000",
+        access_key=s3_netbox_credentials["access-key"],
+        secret_key=s3_netbox_credentials["secret-key"],
+        secure=False,
+    )
+    unit_ip = (
+        status.apps[netbox_nginx_integration.name]
+        .units[netbox_nginx_integration.name + "/0"]
+        .address
+    )
+    base_url = f"http://{unit_ip}:8000"
+    token = get_new_admin_token(juju, netbox_nginx_integration, base_url)
 
-    assert env["S3_ACCESS_KEY"] == s3_credentials["access-key"]
-    assert env["S3_SECRET_KEY"] == s3_credentials["secret-key"]
-    assert env["S3_BUCKET"] == s3_configuration["bucket"]
-    assert env["S3_ENDPOINT"] == s3_configuration["endpoint"]
-    assert env["S3_PATH"] == s3_configuration["path"]
-    assert env["S3_REGION"] == s3_configuration["region"]
-    assert env["S3_URI_STYLE"] == s3_configuration["s3-uri-style"]
+    # Save the current number of objects in the S3 bucket.
+    bucket_name = s3_netbox_configuration["bucket"]
+    boto_res = list(
+        boto_s3_client.list_objects(bucket_name=bucket_name)
+    )  # .list_objects_v2(Bucket=bucket_name)
+    previous_keycount = len(boto_res) if boto_res else 0
 
-    # Check that it list_objects in the bucket. If the connection
-    # is unsuccessful of the bucket does not exist, the code raises.
-    response = http.get(f"http://{unit_ip}:8000/s3/status", timeout=5)
-    assert response.status_code == 200
-    assert "SUCCESS" == response.text
+    # Create a site.
+    headers_with_auth = {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "Authorization": f"TOKEN {token}",
+    }
+    url = f"{base_url}/api/dcim/sites/"
+    site = {
+        "name": "".join((secrets.choice(string.ascii_lowercase) for i in range(5))),
+        "slug": "".join((secrets.choice(string.ascii_lowercase) for i in range(5))),
+    }
+    res = requests.post(url, json=site, timeout=5, headers=headers_with_auth)
+    assert res.status_code == 201
+    site_id = res.json()["id"]
+
+    # Post an image to the site previously created.
+    url = f"{base_url}/api/extras/image-attachments/"
+    # A one pixel image.
+    smallpngimage = (
+        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x01\x00\x00\x00"
+        b"\x007n\xf9$\x00\x00\x00\nIDATx\x01c`\x00\x00\x00\x02\x00\x01su\x01\x18\x00\x00\x00"
+        b"\x00IEND\xaeB`\x82"
+    )
+    files = {"image": ("image.png", smallpngimage)}
+    payload = {
+        "object_type": "dcim.site",
+        "object_id": site_id,
+        "name": "image name",
+        "image_height": 1,
+        "image_width": 1,
+    }
+    res = requests.post(
+        url, files=files, data=payload, timeout=5, headers={"Authorization": f"TOKEN {token}"}
+    )
+    assert res.status_code == 201
+
+    # check that there is a new file in S3.
+    bucket_name = s3_netbox_configuration["bucket"]
+    key_count = len(
+        list(boto_s3_client.list_objects(bucket_name=bucket_name))
+    )  # .list_objects_v2(Bucket=bucket_name)
+    assert key_count == previous_keycount + 1
+

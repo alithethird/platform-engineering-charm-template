@@ -9,7 +9,6 @@ import string
 import jubilant
 import pytest
 import requests
-from minio import Minio
 from saml_test_helper import SamlK8sTestHelper
 
 from tests.integration.helpers import assert_return_true_with_retry, get_new_admin_token
@@ -43,89 +42,6 @@ def test_netbox_health(netbox_app: App, juju: jubilant.Juju) -> None:
             timeout=20,
         )
         assert res.status_code == 200
-
-
-@pytest.mark.usefixtures("netbox_app")
-def test_netbox_storage(
-    netbox_nginx_integration: App,
-    s3_netbox_configuration: dict,
-    minio_app: App,
-    s3_integrator_app: App,
-    s3_netbox_credentials: dict,
-    juju: jubilant.Juju,
-) -> None:
-    """
-    arrange: Build and deploy the NetBox charm.
-    act: Create a site and post an image
-    assert: The site is created and there is an extra object (the image)
-        in S3.
-    """
-    status = juju.status()
-    minio_addr = status.apps[minio_app.name].units[minio_app.name + "/0"].address
-
-    boto_s3_client = Minio(
-        f"{minio_addr}:9000",
-        access_key=s3_netbox_credentials["access-key"],
-        secret_key=s3_netbox_credentials["secret-key"],
-        secure=False,
-    )
-    unit_ip = (
-        status.apps[netbox_nginx_integration.name]
-        .units[netbox_nginx_integration.name + "/0"]
-        .address
-    )
-    base_url = f"http://{unit_ip}:8000"
-    token = get_new_admin_token(juju, netbox_nginx_integration, base_url)
-
-    # Save the current number of objects in the S3 bucket.
-    bucket_name = s3_netbox_configuration["bucket"]
-    boto_res = list(
-        boto_s3_client.list_objects(bucket_name=bucket_name)
-    )  # .list_objects_v2(Bucket=bucket_name)
-    previous_keycount = len(boto_res) if boto_res else 0
-
-    # Create a site.
-    headers_with_auth = {
-        "Accept": "application/json",
-        "Content-Type": "application/json",
-        "Authorization": f"TOKEN {token}",
-    }
-    url = f"{base_url}/api/dcim/sites/"
-    site = {
-        "name": "".join((secrets.choice(string.ascii_lowercase) for i in range(5))),
-        "slug": "".join((secrets.choice(string.ascii_lowercase) for i in range(5))),
-    }
-    res = requests.post(url, json=site, timeout=5, headers=headers_with_auth)
-    assert res.status_code == 201
-    site_id = res.json()["id"]
-
-    # Post an image to the site previously created.
-    url = f"{base_url}/api/extras/image-attachments/"
-    # A one pixel image.
-    smallpngimage = (
-        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x01\x00\x00\x00"
-        b"\x007n\xf9$\x00\x00\x00\nIDATx\x01c`\x00\x00\x00\x02\x00\x01su\x01\x18\x00\x00\x00"
-        b"\x00IEND\xaeB`\x82"
-    )
-    files = {"image": ("image.png", smallpngimage)}
-    payload = {
-        "object_type": "dcim.site",
-        "object_id": site_id,
-        "name": "image name",
-        "image_height": 1,
-        "image_width": 1,
-    }
-    res = requests.post(
-        url, files=files, data=payload, timeout=5, headers={"Authorization": f"TOKEN {token}"}
-    )
-    assert res.status_code == 201
-
-    # check that there is a new file in S3.
-    bucket_name = s3_netbox_configuration["bucket"]
-    key_count = len(
-        list(boto_s3_client.list_objects(bucket_name=bucket_name))
-    )  # .list_objects_v2(Bucket=bucket_name)
-    assert key_count == previous_keycount + 1
 
 
 @pytest.mark.usefixtures("netbox_app")
@@ -202,7 +118,7 @@ def test_netbox_check_cronjobs(
         return False
 
     # Adjust the timeout to the schedule for the syncdatasource cron task
-    res = assert_return_true_with_retry(check_data_source_updated, delay=10, timeout=350)
+    assert_return_true_with_retry(check_data_source_updated, delay=10, timeout=350)
 
 
 def test_saml_integration(
@@ -305,55 +221,3 @@ def test_saml_integration(
     assert "Log Out" in logged_in_page.text
     assert "ubuntu" in logged_in_page.text
     assert "ubuntu" in logged_in_page.text
-
-# @pytest.mark.usefixtures("netbox_nginx_integration")
-# @pytest.mark.usefixtures("netbox_saml_integration")
-# async def test_saml_netbox(
-#     saml_helper: SamlK8sTestHelper,
-#     netbox_hostname: str,
-# ) -> None:
-#     """
-#     arrange: Deploy NetBox with nginx and saml. Check that the
-#         user ubuntu is not logged in.
-#     act: Log in with saml in NetBox.
-#     assert: Check that the user ubuntu is logged in.
-#     """
-#     res = requests.get(
-#         "https://127.0.0.1/",
-#         headers={"Host": netbox_hostname},
-#         verify=False,
-#         timeout=30,  # nosec
-#     )
-#     assert res.status_code == 200
-#     assert "<title>Home | NetBox</title>" in res.text
-#     # The user is not logged in.
-#     assert "Log Out" not in res.text
-#     assert "ubuntu" not in res.text
-
-#     session = requests.session()
-
-#     # Act part. Log in with SAML.
-#     redirect_url = "https://127.0.0.1/oauth/login/saml/?next=%2F&idp=saml"
-#     res = session.get(
-#         redirect_url,
-#         headers={"Host": netbox_hostname},
-#         timeout=5,
-#         verify=False,
-#         allow_redirects=False,
-#     )
-#     assert res.status_code == 302
-#     redirect_url = res.headers["Location"]
-#     saml_response = saml_helper.redirect_sso_login(redirect_url)
-#     assert f"https://{netbox_hostname}" in saml_response.url
-
-#     # Assert part. Check that the user is logged in.
-#     url = saml_response.url.replace(f"https://{netbox_hostname}", "https://127.0.0.1")
-#     logged_in_page = session.post(
-#         url, data=saml_response.data, headers={"Host": netbox_hostname}, timeout=10, verify=False
-#     )
-#     assert logged_in_page.status_code == 200
-#     assert "<title>Home | NetBox</title>" in logged_in_page.text
-#     # The user is logged in.
-#     assert "Log Out" in logged_in_page.text
-#     assert "ubuntu" in logged_in_page.text
-#     assert "ubuntu" in logged_in_page.text

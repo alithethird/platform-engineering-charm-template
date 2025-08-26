@@ -8,6 +8,12 @@ jobs:
     uses: canonical/operator-workflows/.github/workflows/integration_test.yaml@feat/pre-build-script
     secrets: inherit
     with:
+      modules: |
+        [
+          "test_charm.py",
+          "test_s3.py",
+          "test_saml.py"
+        ]
       load-test-enabled: false
       trivy-fs-enabled: true
       trivy-image-config: "trivy.yaml"
