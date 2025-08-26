@@ -10,10 +10,12 @@ import secrets
 import string
 import typing
 
+import jubilant
 import pytest
 import requests
-from juju.action import Action
 from juju.application import Application
+
+from tests.integration.types import App
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +46,7 @@ async def assert_return_true_with_retry(
         await asyncio.sleep(delay)
 
 
-async def get_new_admin_token(netbox_app: Application, netbox_base_url: str):
+def get_new_admin_token(juju: jubilant.Juju, netbox_app: App, netbox_base_url: str) -> str:
     """Create an admin token for Netbox.
 
     Args:
@@ -56,10 +58,11 @@ async def get_new_admin_token(netbox_app: Application, netbox_base_url: str):
     """
     # Create a superuser
     username = "".join((secrets.choice(string.ascii_letters) for i in range(8)))
-    action_create_user: Action = await netbox_app.units[0].run_action(  # type: ignore
-        "create-superuser", username=username, email="admin@example.com"
+    action_create_user = juju.run(
+        f"{netbox_app.name}/0",
+        "create-superuser",
+        {"username": username, "email": "admin@example.com"},
     )
-    await action_create_user.wait()
     assert action_create_user.status == "completed"
     password = action_create_user.results["password"]
 

@@ -16,7 +16,6 @@ from juju.application import Application
 from juju.model import Model
 from pytest import Config
 from pytest_operator.plugin import OpsTest
-from saml_test_helper import SamlK8sTestHelper
 
 from tests.conftest import NETBOX_IMAGE_PARAM
 
@@ -277,65 +276,65 @@ async def netbox_nginx_integration_fixture(
     await model.remove_application(self_signed_cerfiticates.name)
 
 
-@pytest_asyncio.fixture(scope="module", name="saml_helper")
-async def saml_helper_fixture(
-    model: Model,
-) -> SamlK8sTestHelper:
-    """Fixture for SamlHelper."""
-    saml_helper = SamlK8sTestHelper.deploy_saml_idp(model.name)
-    return saml_helper
+# @pytest_asyncio.fixture(scope="module", name="saml_helper")
+# async def saml_helper_fixture(
+#     model: Model,
+# ) -> SamlK8sTestHelper:
+#     """Fixture for SamlHelper."""
+#     saml_helper = SamlK8sTestHelper.deploy_saml_idp(model.name)
+#     return saml_helper
 
 
-@pytest_asyncio.fixture(scope="module", name="netbox_saml_integration")
-async def netbox_saml_integration_fixture(
-    model: Model,
-    saml_app: Application,
-    netbox_app: Application,
-    netbox_hostname: str,
-    saml_helper: SamlK8sTestHelper,
-):
-    """Integrate Netbox and SAML for saml integration."""
-    await netbox_app.set_config(
-        {
-            "saml-sp-entity-id": f"https://{netbox_hostname}",
-            # The saml Name for FriendlyName "uid"
-            "saml-username": "urn:oid:0.9.2342.19200300.100.1.1",
-        }
-    )
-    saml_helper.prepare_pod(model.name, f"{saml_app.name}-0")
-    saml_helper.prepare_pod(model.name, f"{netbox_app.name}-0")
-    await saml_app.set_config(
-        {
-            "entity_id": f"https://{saml_helper.SAML_HOST}/metadata",
-            "metadata_url": f"https://{saml_helper.SAML_HOST}/metadata",
-        }
-    )
-    await model.wait_for_idle(idle_period=30)
-    relation = await model.add_relation(saml_app.name, netbox_app.name)
-    await model.wait_for_idle(
-        apps=[saml_app.name, netbox_app.name],
-        idle_period=30,
-        status="active",
-    )
+# @pytest_asyncio.fixture(scope="module", name="netbox_saml_integration")
+# async def netbox_saml_integration_fixture(
+#     model: Model,
+#     saml_app: Application,
+#     netbox_app: Application,
+#     netbox_hostname: str,
+#     saml_helper: SamlK8sTestHelper,
+# ):
+#     """Integrate Netbox and SAML for saml integration."""
+#     await netbox_app.set_config(
+#         {
+#             "saml-sp-entity-id": f"https://{netbox_hostname}",
+#             # The saml Name for FriendlyName "uid"
+#             "saml-username": "urn:oid:0.9.2342.19200300.100.1.1",
+#         }
+#     )
+#     saml_helper.prepare_pod(model.name, f"{saml_app.name}-0")
+#     saml_helper.prepare_pod(model.name, f"{netbox_app.name}-0")
+#     await saml_app.set_config(
+#         {
+#             "entity_id": f"https://{saml_helper.SAML_HOST}/metadata",
+#             "metadata_url": f"https://{saml_helper.SAML_HOST}/metadata",
+#         }
+#     )
+#     await model.wait_for_idle(idle_period=30)
+#     relation = await model.add_relation(saml_app.name, netbox_app.name)
+#     await model.wait_for_idle(
+#         apps=[saml_app.name, netbox_app.name],
+#         idle_period=30,
+#         status="active",
+#     )
 
-    # For the saml_helper, a SAML XML metadata for the service is needed.
-    # There are instructions to generate it in:
-    # https://python-social-auth.readthedocs.io/en/latest/backends/saml.html#basic-usage.
-    # This one is instead a minimalistic one that works for the test.
-    metadata_xml = """
-    <md:EntityDescriptor xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata" cacheDuration="P10D"
-                         entityID="https://netbox.internal">
-      <md:SPSSODescriptor protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol"
-                          AuthnRequestsSigned="false" WantAssertionsSigned="true">
-        <md:AssertionConsumerService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
-                                     Location="https://netbox.internal/oauth/complete/saml/"
-                                     index="1"/>
-      </md:SPSSODescriptor>
-    </md:EntityDescriptor>
-    """
-    saml_helper.register_service_provider(name=netbox_hostname, metadata=metadata_xml)
-    yield relation
-    await netbox_app.destroy_relation("saml", f"{saml_app.name}:saml")
+#     # For the saml_helper, a SAML XML metadata for the service is needed.
+#     # There are instructions to generate it in:
+#     # https://python-social-auth.readthedocs.io/en/latest/backends/saml.html#basic-usage.
+#     # This one is instead a minimalistic one that works for the test.
+#     metadata_xml = """
+#     <md:EntityDescriptor xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata" cacheDuration="P10D"
+#                          entityID="https://netbox.internal">
+#       <md:SPSSODescriptor protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol"
+#                           AuthnRequestsSigned="false" WantAssertionsSigned="true">
+#         <md:AssertionConsumerService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
+#                                      Location="https://netbox.internal/oauth/complete/saml/"
+#                                      index="1"/>
+#       </md:SPSSODescriptor>
+#     </md:EntityDescriptor>
+#     """
+#     saml_helper.register_service_provider(name=netbox_hostname, metadata=metadata_xml)
+#     yield relation
+#     await netbox_app.destroy_relation("saml", f"{saml_app.name}:saml")
 
 
 # @pytest.fixture(scope="module", name="localstack_address")
@@ -394,7 +393,7 @@ def s3_netbox_bucket_fixture(
 from collections.abc import Generator
 from typing import cast
 
-#--------------------------------------------------
+# --------------------------------------------------
 import jubilant
 from minio import Minio
 
@@ -456,12 +455,14 @@ def minio_app_fixture(juju: jubilant.Juju, minio_app_name, s3_netbox_credentials
     juju.wait(lambda status: status.apps[minio_app_name].is_active, timeout=60 * 30)
     return App(minio_app_name)
 
+
 @pytest.fixture(scope="module", name="s3_integrator_app")
 def s3_integrator_app_fixture(
     juju: jubilant.Juju,
-    minio_app: App, 
+    minio_app: App,
     s3_netbox_configuration: dict,
-    s3_netbox_credentials: dict,):
+    s3_netbox_credentials: dict,
+):
     s3_integrator = "s3-integrator"
     if juju.status().apps.get(s3_integrator):
         logger.info(f"{s3_integrator} already deployed")
@@ -521,6 +522,7 @@ def postgresql_app_fixture(
     )
     return App(postgresql_app_name)
 
+
 @pytest.fixture(scope="module", name="redis_app")
 def redis_app_fixture(
     juju: jubilant.Juju,
@@ -537,6 +539,7 @@ def redis_app_fixture(
         channel="edge",
     )
     return App(redis_app_name)
+
 
 @pytest.fixture(scope="module", name="netbox_app")
 def netbox_app_fixture(
@@ -577,7 +580,9 @@ def netbox_app_fixture(
         f"{redis_app.name}",
     )
     juju.wait(
-        lambda status: jubilant.all_active(status, s3_integrator_app.name,postgresql_app.name, redis_app.name, netbox_app_name),
+        lambda status: jubilant.all_active(
+            status, s3_integrator_app.name, postgresql_app.name, redis_app.name, netbox_app_name
+        ),
         timeout=300,
     )
 
