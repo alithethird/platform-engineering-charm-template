@@ -520,7 +520,7 @@ def netbox_nginx_integration_fixture(
 
     try:
         juju.integrate(
-            f"{nginx_app.name}:certificates",
+            nginx_app.name,
             "self-signed-certificates",
         )
     except jubilant.CLIError as e:
