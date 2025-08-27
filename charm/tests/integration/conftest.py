@@ -5,7 +5,6 @@
 
 import logging
 import os.path
-from secrets import token_hex
 
 import pytest
 import pytest_asyncio
@@ -409,8 +408,8 @@ def s3_netbox_credentials_fixture() -> dict:
         The S3 credentials as a dict
     """
     return {
-        "access-key": token_hex(16),
-        "secret-key": token_hex(16),
+        "access-key": "test-access-key",
+        "secret-key": "test-secret-key"
     }
 
 
@@ -517,7 +516,10 @@ def netbox_nginx_integration_fixture(
             channel="latest/edge",
             trust=True,
         )
-
+    juju.wait(
+        jubilant.all_active,
+        timeout=10 * 60,
+    )
     try:
         juju.integrate(
             nginx_app.name,
@@ -661,10 +663,7 @@ def netbox_app_fixture(
     # )
     juju.wait(
         lambda status: jubilant.all_active(status, s3_integrator_app.name,postgresql_app.name, redis_app.name, netbox_app_name),
-        timeout=10 * 60,
+        timeout=15 * 60,
     )
 
     return App(netbox_app_name)
-    return App(netbox_app_name)
-    return App(netbox_app_name)
-
