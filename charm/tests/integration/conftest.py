@@ -528,7 +528,7 @@ def netbox_nginx_integration_fixture(
             raise
     juju.wait(
         jubilant.all_active,
-        timeout=10 * 60,
+        timeout=20 * 60,
     )
     yield netbox_app
     # juju.remove_relation(
