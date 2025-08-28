@@ -300,7 +300,7 @@ def saml_helper_fixture(
 ) -> SamlK8sTestHelper:
     """Fixture for SamlHelper."""
     model_name = juju.status().model.name
-    saml_helper = SamlK8sTestHelper.deploy_saml_idp(model_name)
+    saml_helper = SamlK8sTestHelper.deploy_saml_idp(model_name, kube_config="/var/snap/microk8s/current/credentials/client.config")
     return saml_helper
 
 @pytest.fixture(scope="module", name="saml_app")
@@ -349,6 +349,11 @@ def netbox_saml_integration_fixture(
             "metadata_url": f"https://{saml_helper.SAML_HOST}/metadata",
         }
     )
+    juju.config(
+        netbox_app.name,{
+            "saml-sp-entity-id": f"https://{netbox_hostname}",
+            # The saml Name for FriendlyName "uid"
+            "saml-username": "urn:oid:0.9.2342.19200300.100.1.1",})
     try:
         juju.integrate(saml_app.name, netbox_app.name)
     except Exception as e:
@@ -380,7 +385,7 @@ def netbox_saml_integration_fixture(
             logger.info("Service provider already registered")
         else:
             raise
-    return saml_app
+    return saml_helper
 
 @pytest.fixture(scope="module", name="s3_netbox_configuration")
 def s3_netbox_configuration_fixture(juju: jubilant.Juju,minio_app: App) -> dict:

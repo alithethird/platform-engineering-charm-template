@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 @pytest.mark.usefixtures("netbox_app")
 def test_netbox_storage(
-    netbox_nginx_integration: App,
+    netbox_app: App,
     s3_netbox_configuration: dict,
     minio_app: App,
     s3_integrator_app: App,
@@ -47,8 +47,8 @@ def test_netbox_storage(
         secure=False,
     )
     unit_ip = (
-        status.apps[netbox_nginx_integration.name]
-        .units[netbox_nginx_integration.name + "/0"]
+        status.apps[netbox_app.name]
+        .units[netbox_app.name + "/0"]
         .address
     )
     juju.wait(
@@ -56,7 +56,7 @@ def test_netbox_storage(
             timeout=600,
     )
     base_url = f"http://{unit_ip}:8000"
-    token = get_new_admin_token(juju, netbox_nginx_integration, base_url)
+    token = get_new_admin_token(juju, netbox_app, base_url)
 
     # Save the current number of objects in the S3 bucket.
     bucket_name = s3_netbox_configuration["bucket"]

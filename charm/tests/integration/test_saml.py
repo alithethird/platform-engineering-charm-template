@@ -4,7 +4,7 @@
 
 """Integration tests for Netbox SAML integration."""
 import logging
-
+import pytest
 import jubilant
 import requests
 from saml_test_helper import SamlK8sTestHelper
@@ -13,10 +13,11 @@ from tests.integration.types import App
 
 logger = logging.getLogger(__name__)
 
-
+@pytest.mark.usefixtures("netbox_saml_integration")
 def test_saml_integration(
-    netbox_nginx_integration: App,
+    netbox_app: App,
     juju: jubilant.Juju,
+    saml_helper: SamlK8sTestHelper,
     s3_netbox_configuration,
     s3_netbox_credentials,
     netbox_hostname: str,
@@ -32,47 +33,47 @@ def test_saml_integration(
     # However, for saml-integrator to get the metadata, we need a real SP, so SamlK8sTestHelper is
     # used to not have a dependency to an external SP.
 
-    model_name = juju.status().model.name
+    # model_name = juju.status().model.name
 
     saml_integrator_app_name = "saml-integrator"
-    status = juju.status()
-    if saml_integrator_app_name not in status.apps:
-        juju.deploy(
-            saml_integrator_app_name,
-            channel="latest/edge",
-            base="ubuntu@22.04",
-            trust=True,
-        )
-        juju.wait(
-            lambda status: jubilant.all_agents_idle(status, saml_integrator_app_name),
-            timeout=600,
-        )
-    saml_helper = SamlK8sTestHelper.deploy_saml_idp(model_name, kube_config="/var/snap/microk8s/current/credentials/client.config")# , 
+    # status = juju.status()
+    # if saml_integrator_app_name not in status.apps:
+    #     juju.deploy(
+    #         saml_integrator_app_name,
+    #         channel="latest/edge",
+    #         base="ubuntu@22.04",
+    #         trust=True,
+    #     )
+    #     juju.wait(
+    #         lambda status: jubilant.all_agents_idle(status, saml_integrator_app_name),
+    #         timeout=600,
+    #     )
+    # saml_helper = SamlK8sTestHelper.deploy_saml_idp(model_name, kube_config="/var/snap/microk8s/current/credentials/client.config")# , 
 
-    saml_helper.prepare_pod(model_name, f"{saml_integrator_app_name}-0")
-    saml_helper.prepare_pod(model_name, f"{netbox_nginx_integration.name}-0")
-    juju.config(
-        netbox_nginx_integration.name,{
-            "saml-sp-entity-id": f"https://{netbox_hostname}",
-            # The saml Name for FriendlyName "uid"
-            "saml-username": "urn:oid:0.9.2342.19200300.100.1.1",})
-    juju.config(
-        saml_integrator_app_name,
-        {
-            "entity_id": saml_helper.entity_id,
-            "metadata_url": saml_helper.metadata_url,
-        },
-    )
-    try:
-        juju.integrate(saml_integrator_app_name, netbox_nginx_integration.name)
-    except jubilant.CLIError as e:
-        if "already exists" in str(e):
-            logger.warning("The relation already exists.")
-        else:
-            raise e
+    # saml_helper.prepare_pod(model_name, f"{saml_integrator_app_name}-0")
+    # saml_helper.prepare_pod(model_name, f"{netbox_app.name}-0")
+    # juju.config(
+    #     netbox_app.name,{
+    #         "saml-sp-entity-id": f"https://{netbox_hostname}",
+    #         # The saml Name for FriendlyName "uid"
+    #         "saml-username": "urn:oid:0.9.2342.19200300.100.1.1",})
+    # juju.config(
+    #     saml_integrator_app_name,
+    #     {
+    #         "entity_id": saml_helper.entity_id,
+    #         "metadata_url": saml_helper.metadata_url,
+    #     },
+    # )
+    # try:
+    #     juju.integrate(saml_integrator_app_name, netbox_app.name)
+    # except jubilant.CLIError as e:
+    #     if "already exists" in str(e):
+    #         logger.warning("The relation already exists.")
+    #     else:
+    #         raise e
 
     juju.wait(
-        lambda status: jubilant.all_active(status, saml_integrator_app_name, netbox_nginx_integration.name),
+        lambda status: jubilant.all_active(status, saml_integrator_app_name, netbox_app.name),
         timeout=600,
     )
     res = requests.get(
