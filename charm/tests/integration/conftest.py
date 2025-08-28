@@ -300,7 +300,7 @@ def saml_helper_fixture(
 ) -> SamlK8sTestHelper:
     """Fixture for SamlHelper."""
     model_name = juju.status().model.name
-    saml_helper = SamlK8sTestHelper.deploy_saml_idp(model_name, kube_config="/var/snap/microk8s/current/credentials/client.config")
+    saml_helper = SamlK8sTestHelper.deploy_saml_idp(model_name)
     return saml_helper
 
 @pytest.fixture(scope="module", name="saml_app")
