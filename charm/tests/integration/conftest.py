@@ -516,6 +516,10 @@ def netbox_nginx_integration_fixture(
             channel="latest/edge",
             trust=True,
         )
+    juju.wait(
+        jubilant.all_active,
+        timeout=20 * 60,
+    )
     try:
         juju.integrate(
             f"{nginx_app.name}:certificates",
@@ -528,7 +532,7 @@ def netbox_nginx_integration_fixture(
             raise
     juju.wait(
         jubilant.all_active,
-        timeout=20 * 60,
+        timeout=5 * 60,
     )
     yield netbox_app
     # juju.remove_relation(

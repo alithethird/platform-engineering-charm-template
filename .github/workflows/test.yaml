@@ -11,4 +11,7 @@ jobs:
       charm-directory: "charm"
       shellcheck-working-directory: "./charm"
       vale-style-check: true
+      self-hosted-runner: true
+      self-hosted-runner-label: "edge"
+
 
