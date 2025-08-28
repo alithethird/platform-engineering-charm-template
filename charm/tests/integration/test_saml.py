@@ -4,20 +4,19 @@
 
 """Integration tests for Netbox SAML integration."""
 import logging
-import pytest
+
 import jubilant
 import requests
-from saml_test_helper import SamlK8sTestHelper
-
+import pytest
 from tests.integration.types import App
 
 logger = logging.getLogger(__name__)
 
 @pytest.mark.usefixtures("netbox_saml_integration")
 def test_saml_integration(
-    netbox_app: App,
+    netbox_nginx_integration: App,
     juju: jubilant.Juju,
-    saml_helper: SamlK8sTestHelper,
+    saml_helper,
     s3_netbox_configuration,
     s3_netbox_credentials,
     netbox_hostname: str,
@@ -51,9 +50,9 @@ def test_saml_integration(
     # saml_helper = SamlK8sTestHelper.deploy_saml_idp(model_name, kube_config="/var/snap/microk8s/current/credentials/client.config")# , 
 
     # saml_helper.prepare_pod(model_name, f"{saml_integrator_app_name}-0")
-    # saml_helper.prepare_pod(model_name, f"{netbox_app.name}-0")
+    # saml_helper.prepare_pod(model_name, f"{netbox_nginx_integration.name}-0")
     # juju.config(
-    #     netbox_app.name,{
+    #     netbox_nginx_integration.name,{
     #         "saml-sp-entity-id": f"https://{netbox_hostname}",
     #         # The saml Name for FriendlyName "uid"
     #         "saml-username": "urn:oid:0.9.2342.19200300.100.1.1",})
@@ -65,7 +64,7 @@ def test_saml_integration(
     #     },
     # )
     # try:
-    #     juju.integrate(saml_integrator_app_name, netbox_app.name)
+    #     juju.integrate(saml_integrator_app_name, netbox_nginx_integration.name)
     # except jubilant.CLIError as e:
     #     if "already exists" in str(e):
     #         logger.warning("The relation already exists.")
@@ -73,7 +72,7 @@ def test_saml_integration(
     #         raise e
 
     juju.wait(
-        lambda status: jubilant.all_active(status, saml_integrator_app_name, netbox_app.name),
+        lambda status: jubilant.all_active(status, saml_integrator_app_name, netbox_nginx_integration.name),
         timeout=600,
     )
     res = requests.get(

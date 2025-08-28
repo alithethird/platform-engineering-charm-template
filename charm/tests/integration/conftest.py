@@ -514,30 +514,30 @@ def netbox_nginx_integration_fixture(
             logger.info("Relation already exists")
         else:
             raise
-    status = juju.status()
-    if not status.apps.get("self-signed-certificates"):
-        juju.deploy(
-            "self-signed-certificates",
-            channel="latest/edge",
-            trust=True,
-        )
+    # status = juju.status()
+    # if not status.apps.get("self-signed-certificates"):
+    #     juju.deploy(
+    #         "self-signed-certificates",
+    #         channel="latest/edge",
+    #         trust=True,
+    #     )
+    # juju.wait(
+    #     jubilant.all_active,
+    #     timeout=20 * 60,
+    # )
+    # try:
+    #     juju.integrate(
+    #         f"{nginx_app.name}:certificates",
+    #         "self-signed-certificates",
+    #     )
+    # except jubilant.CLIError as e:
+    #     if "already exists" in str(e):
+    #         logger.info("Relation already exists")
+    #     else:
+    #         raise
     juju.wait(
         jubilant.all_active,
-        timeout=20 * 60,
-    )
-    try:
-        juju.integrate(
-            f"{nginx_app.name}:certificates",
-            "self-signed-certificates",
-        )
-    except jubilant.CLIError as e:
-        if "already exists" in str(e):
-            logger.info("Relation already exists")
-        else:
-            raise
-    juju.wait(
-        jubilant.all_active,
-        timeout=5 * 60,
+        timeout=15 * 60,
     )
     yield netbox_app
     # juju.remove_relation(
