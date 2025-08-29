@@ -7,6 +7,10 @@ from typing import NamedTuple
 
 
 class App(NamedTuple):
-    """Holds deployed application information for app_fixture."""
+    """Holds deployed application information for app_fixture.
+
+    Attrs:
+        name: Name of the application.
+    """
 
     name: str

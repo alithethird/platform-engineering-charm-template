@@ -4,21 +4,17 @@
 
 """Integration tests for 12Factor charms S3 integration."""
 import logging
-
-import jubilant
-import requests
-from minio import Minio
-
-from tests.integration.types import App
-
-
 import secrets
 import string
 
+import jubilant
 import pytest
+import requests
+from minio import Minio
 
 from tests.integration.helpers import get_new_admin_token
 from tests.integration.types import App
+
 logger = logging.getLogger(__name__)
 
 
@@ -46,14 +42,10 @@ def test_netbox_storage(
         secret_key=s3_netbox_credentials["secret-key"],
         secure=False,
     )
-    unit_ip = (
-        status.apps[netbox_app.name]
-        .units[netbox_app.name + "/0"]
-        .address
-    )
+    unit_ip = status.apps[netbox_app.name].units[netbox_app.name + "/0"].address
     juju.wait(
         jubilant.all_active,
-            timeout=600,
+        timeout=600,
     )
     base_url = f"http://{unit_ip}:8000"
     token = get_new_admin_token(juju, netbox_app, base_url)
@@ -107,4 +99,3 @@ def test_netbox_storage(
         list(boto_s3_client.list_objects(bucket_name=bucket_name))
     )  # .list_objects_v2(Bucket=bucket_name)
     assert key_count == previous_keycount + 1
-

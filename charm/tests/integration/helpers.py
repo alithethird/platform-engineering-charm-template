@@ -50,6 +50,7 @@ def get_new_admin_token(juju: jubilant.Juju, netbox_app: App, netbox_base_url: s
     """Create an admin token for Netbox.
 
     Args:
+        juju: Juju instance.
         netbox_app: netbox app. Necessary to create the superuser
         netbox_base_url: NetBox base url. Needed to get token from superuser.
 

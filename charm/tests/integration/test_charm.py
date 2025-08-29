@@ -9,8 +9,9 @@ import string
 import jubilant
 import pytest
 import requests
+from tenacity import retry, stop_after_attempt, wait_exponential
 
-from tests.integration.helpers import assert_return_true_with_retry, get_new_admin_token
+from tests.integration.helpers import get_new_admin_token
 from tests.integration.types import App
 
 logger = logging.getLogger(__name__)
@@ -102,20 +103,13 @@ def test_netbox_check_cronjobs(
     data_source_id = res.json()["id"]
 
     # The cron task for the syncdatasource should update the datasource status to completed.
-    def check_data_source_updated() -> bool:
-        """Check that the data source gets updated.
-
-        Returns:
-           Whether the function succeeded or not.
-        """
+    @retry(stop=stop_after_attempt(15), wait=wait_exponential(multiplier=1.5, min=4, max=10))
+    def check_data_source_updated():
+        """Check that the data source gets updated."""
         url = f"{base_url}/api/core/data-sources/{data_source_id}/"
         res = requests.get(url, timeout=5, headers=headers_with_auth)
         assert res.status_code == 200
         logger.info("current datasource status: %s", res.json()["status"])
-        if res.json()["status"]["value"] == "completed":
-            return True
-        return False
+        assert res.json()["status"]["value"] == "completed"
 
-    # Adjust the timeout to the schedule for the syncdatasource cron task
-    assert_return_true_with_retry(check_data_source_updated, delay=10, timeout=350)
-
+    check_data_source_updated()

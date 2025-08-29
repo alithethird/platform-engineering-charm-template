@@ -5,28 +5,22 @@
 
 import logging
 import os.path
+from collections.abc import Generator
+from typing import cast
 
+import jubilant
 import pytest
-import pytest_asyncio
-from juju.application import Application
-from juju.model import Model
+from minio import Minio
 from pytest import Config
-from pytest_operator.plugin import OpsTest
 from saml_test_helper import SamlK8sTestHelper
 
 from tests.conftest import NETBOX_IMAGE_PARAM
+from tests.integration.types import App
 
 logger = logging.getLogger(__name__)
 
 # caused by pytest fixtures, mark does not work in fixtures
 # pylint: disable=too-many-arguments, unused-argument
-
-
-@pytest_asyncio.fixture(scope="module", name="model")
-async def model_fixture(ops_test: OpsTest) -> Model:
-    """Return the current testing juju model."""
-    assert ops_test.model
-    return ops_test.model
 
 
 @pytest.fixture(scope="module", name="saml_app_name")
@@ -71,64 +65,7 @@ def redis_app_name_fixture() -> str:
     return "redis-k8s"
 
 
-# @pytest_asyncio.fixture(scope="module", name="nginx_app")
-# async def nginx_app_fixture(
-#     ops_test: OpsTest,
-#     nginx_app_name: str,
-#     model: Model,
-#     pytestconfig: Config,
-# ) -> Application:
-#     """Deploy nginx."""
-#     async with ops_test.fast_forward():
-#         app = await model.deploy(nginx_app_name, channel="latest/edge", revision=99, trust=True)
-#         await model.wait_for_idle()
-#     return app
-
-
-@pytest_asyncio.fixture(scope="module", name="postgresql_app")
-async def postgresql_app_fixture(
-    ops_test: OpsTest,
-    postgresql_app_name: str,
-    model: Model,
-    pytestconfig: Config,
-) -> Application:
-    """Deploy postgresql."""
-    if postgresql_app_name in model.applications:
-        return model.applications[postgresql_app_name]
-    async with ops_test.fast_forward():
-        app = await model.deploy(postgresql_app_name, channel="14/stable", trust=True)
-        await model.wait_for_idle(apps=[postgresql_app_name], status="active")
-    return app
-
-
-# @pytest_asyncio.fixture(scope="module", name="s3_integrator_app")
-# async def s3_integrator_app_fixture(
-#     model: Model,
-#     s3_integrator_app_name: str,
-#     s3_netbox_configuration: dict,
-#     s3_netbox_credentials: dict,
-# ):
-#     """Returns a s3-integrator app configured with parameters."""
-#     if "s3-integrator" in model.applications:
-#         return model.applications["s3-integrator"]
-
-#     s3_integrator_app = await model.deploy(
-#         "s3-integrator",
-#         application_name=s3_integrator_app_name,
-#         channel="1/stable",
-#         config=s3_netbox_configuration,
-#     )
-#     await model.wait_for_idle(apps=[s3_integrator_app_name], idle_period=5, status="blocked")
-#     action_sync_s3_credentials: Action = await s3_integrator_app.units[0].run_action(
-#         "sync-s3-credentials",
-#         **s3_netbox_credentials,
-#     )
-#     await action_sync_s3_credentials.wait()
-#     await model.wait_for_idle(apps=[s3_integrator_app_name], status="active")
-#     return s3_integrator_app
-
-
-@pytest_asyncio.fixture(scope="module", name="netbox_app_image")
+@pytest.fixture(scope="module", name="netbox_app_image")
 def netbox_app_image_fixture(pytestconfig: Config) -> str:
     """Get value from parameter netbox-image."""
     netbox_app_image = pytestconfig.getoption(NETBOX_IMAGE_PARAM)
@@ -136,8 +73,8 @@ def netbox_app_image_fixture(pytestconfig: Config) -> str:
     return netbox_app_image
 
 
-@pytest_asyncio.fixture(scope="module", name="netbox_charm")
-async def netbox_charm_fixture(pytestconfig: Config) -> str:
+@pytest.fixture(scope="module", name="netbox_charm")
+def netbox_charm_fixture(pytestconfig: Config) -> str:
     """Get value from parameter charm-file."""
     charm = pytestconfig.getoption("--charm-file")
     assert charm, "--charm-file must be set"
@@ -145,153 +82,6 @@ async def netbox_charm_fixture(pytestconfig: Config) -> str:
         logger.info("Using parent directory for charm file")
         charm = os.path.join("..", charm)
     return charm
-
-
-# @pytest_asyncio.fixture(scope="module", name="netbox_app")
-# async def netbox_app_fixture(
-#     ops_test: OpsTest,
-#     model: Model,
-#     netbox_charm: str,
-#     netbox_app_image: str,
-#     netbox_app_name: str,
-#     postgresql_app_name: str,
-#     redis_app_name: str,
-#     redis_app: Application,
-#     postgresql_app: Application,
-#     pytestconfig: Config,
-#     s3_netbox_configuration: dict,
-#     s3_integrator_app_name: str,
-#     s3_integrator_app: Application,
-# ) -> Application:
-#     """Deploy netbox app."""
-#     if netbox_app_name in model.applications:
-#         return model.applications[netbox_app_name]
-
-#     resources = {
-#         "django-app-image": netbox_app_image,
-#     }
-#     app = await model.deploy(
-#         f"./{netbox_charm}",
-#         resources=resources,
-#         config={
-#             "django-debug": False,
-#             "django-allowed-hosts": "*",
-#         },
-#     )
-#     # If update_status comes before pebble ready, the unit gets to
-#     # error state. Just do not fail in that case.
-#     await model.wait_for_idle(apps=[netbox_app_name], raise_on_error=False)
-
-#     await model.relate(f"{netbox_app_name}:s3", f"{s3_integrator_app_name}")
-#     await model.relate(f"{netbox_app_name}:postgresql", f"{postgresql_app_name}")
-#     await model.relate(f"{netbox_app_name}:redis", f"{redis_app_name}")
-
-#     await model.wait_for_idle(apps=[netbox_app_name, postgresql_app_name], status="active")
-
-#     return app
-
-
-# @pytest_asyncio.fixture(scope="module", name="redis_app")
-# async def redis_app_fixture(
-#     redis_app_name: str,
-#     model: Model,
-#     pytestconfig: Config,
-# ) -> Application:
-#     """Deploy redis-k8s."""
-#     if redis_app_name in model.applications:
-#         return model.applications[redis_app_name]
-
-#     app = await model.deploy(redis_app_name, channel="edge")
-#     await model.wait_for_idle(apps=[redis_app_name], status="active")
-#     return app
-
-
-# @pytest_asyncio.fixture(scope="module", name="netbox_nginx_integration")
-# async def netbox_nginx_integration_fixture(
-#     model: Model,
-#     nginx_app: Application,
-#     netbox_app: Application,
-#     netbox_hostname: str,
-# ):
-#     """Integrate Netbox and Nginx for ingress integration."""
-#     await nginx_app.set_config({"service-hostname": netbox_hostname, "path-routes": "/"})
-#     await model.wait_for_idle()
-#     relation = await model.add_relation(f"{netbox_app.name}", f"{nginx_app.name}")
-#     await model.wait_for_idle(
-#         apps=[netbox_app.name, nginx_app.name], idle_period=30, status="active"
-#     )
-#     self_signed_cerfiticates = await model.deploy(
-#         "self-signed-certificates", channel="latest/edge", trust=True
-#     )
-#     await model.relate(f"{nginx_app.name}", f"{self_signed_cerfiticates.name}")
-#     await model.wait_for_idle()
-#     yield relation
-#     await netbox_app.destroy_relation("ingress", f"{nginx_app.name}:ingress")
-#     await model.remove_application(self_signed_cerfiticates.name)
-
-
-
-# @pytest.fixture(scope="module", name="localstack_address")
-# def localstack_address_fixture(pytestconfig: Config):
-#     """Provides localstack IP address to be used in the integration test."""
-#     address = pytestconfig.getoption("--localstack-address")
-#     if not address:
-#         raise ValueError("--localstack-address argument is required for selected test cases")
-#     yield address
-
-
-# @pytest.fixture(scope="function", name="boto_s3_client")
-# def boto_s3_client_fixture(s3_netbox_configuration: dict, s3_netbox_credentials: dict):
-#     """Return a S3 boto3 client ready to use
-
-#     Returns:
-#         The boto S3 client
-#     """
-#     s3_client_config = BotoConfig(
-#         region_name=s3_netbox_configuration["region"],
-#         s3={
-#             "addressing_style": "virtual",
-#         },
-#         # no_proxy env variable is not read by boto3, so
-#         # this is needed for the tests to avoid hitting the proxy.
-#         proxies={},
-#     )
-
-#     s3_client = boto3.client(
-#         "s3",
-#         s3_netbox_configuration["region"],
-#         aws_access_key_id=s3_netbox_credentials["access-key"],
-#         aws_secret_access_key=s3_netbox_credentials["secret-key"],
-#         endpoint_url=s3_netbox_configuration["endpoint"],
-#         use_ssl=False,
-#         config=s3_client_config,
-#     )
-#     yield s3_client
-
-
-# @pytest.fixture(scope="function", name="s3_netbox_bucket")
-# def s3_netbox_bucket_fixture(
-#     s3_netbox_configuration: dict, s3_netbox_credentials: dict, boto_s3_client: typing.Any
-# ):
-#     """Creates a bucket using S3 configuration."""
-#     bucket_name = s3_netbox_configuration["bucket"]
-#     boto_s3_client.create_bucket(Bucket=bucket_name)
-#     yield
-#     objectsresponse = boto_s3_client.list_objects(Bucket=bucket_name)
-#     if "Contents" in objectsresponse:
-#         for c in objectsresponse["Contents"]:
-#             boto_s3_client.delete_object(Bucket=bucket_name, Key=c["Key"])
-#     boto_s3_client.delete_bucket(Bucket=bucket_name)
-
-
-from collections.abc import Generator
-from typing import cast
-
-#--------------------------------------------------
-import jubilant
-from minio import Minio
-
-from tests.integration.types import App
 
 
 @pytest.fixture(scope="module", name="saml_helper")
@@ -302,6 +92,7 @@ def saml_helper_fixture(
     model_name = juju.status().model.name
     saml_helper = SamlK8sTestHelper.deploy_saml_idp(model_name)
     return saml_helper
+
 
 @pytest.fixture(scope="module", name="saml_app")
 def saml_app_fixture(
@@ -314,7 +105,8 @@ def saml_app_fixture(
         return App(saml_app_name)
     juju.deploy(
         saml_app_name,
-        channel="latest/edge",)
+        channel="latest/edge",
+    )
     return App(saml_app_name)
 
 
@@ -327,12 +119,13 @@ def netbox_saml_integration_fixture(
     saml_helper: SamlK8sTestHelper,
 ):
     """Integrate Netbox and SAML for saml integration."""
-    juju.config(netbox_app.name,
+    juju.config(
+        netbox_app.name,
         {
             "saml-sp-entity-id": f"https://{netbox_hostname}",
             # The saml Name for FriendlyName "uid"
             "saml-username": "urn:oid:0.9.2342.19200300.100.1.1",
-        }
+        },
     )
     model_name = juju.status().model.name
     try:
@@ -343,17 +136,21 @@ def netbox_saml_integration_fixture(
             logger.info("Pod already prepared")
         else:
             raise
-    juju.config(saml_app.name,
+    juju.config(
+        saml_app.name,
         {
             "entity_id": f"https://{saml_helper.SAML_HOST}/metadata",
             "metadata_url": f"https://{saml_helper.SAML_HOST}/metadata",
-        }
+        },
     )
     juju.config(
-        netbox_app.name,{
+        netbox_app.name,
+        {
             "saml-sp-entity-id": f"https://{netbox_hostname}",
             # The saml Name for FriendlyName "uid"
-            "saml-username": "urn:oid:0.9.2342.19200300.100.1.1",})
+            "saml-username": "urn:oid:0.9.2342.19200300.100.1.1",
+        },
+    )
     try:
         juju.integrate(saml_app.name, netbox_app.name)
     except Exception as e:
@@ -361,7 +158,9 @@ def netbox_saml_integration_fixture(
             logger.info("Relation already exists")
         else:
             raise
-    juju.wait(lambda status: jubilant.all_active(status, saml_app.name, netbox_app.name), timeout=10*60)
+    juju.wait(
+        lambda status: jubilant.all_active(status, saml_app.name, netbox_app.name), timeout=10 * 60
+    )
 
     # For the saml_helper, a SAML XML metadata for the service is needed.
     # There are instructions to generate it in:
@@ -387,8 +186,9 @@ def netbox_saml_integration_fixture(
             raise
     return saml_helper
 
+
 @pytest.fixture(scope="module", name="s3_netbox_configuration")
-def s3_netbox_configuration_fixture(juju: jubilant.Juju,minio_app: App) -> dict:
+def s3_netbox_configuration_fixture(juju: jubilant.Juju, minio_app: App) -> dict:
     """Return the S3 configuration to use.
 
     Returns:
@@ -412,10 +212,7 @@ def s3_netbox_credentials_fixture() -> dict:
     Returns:
         The S3 credentials as a dict
     """
-    return {
-        "access-key": "test-access-key",
-        "secret-key": "test-secret-key"
-    }
+    return {"access-key": "test-access-key", "secret-key": "test-secret-key"}
 
 
 @pytest.fixture(scope="session")
@@ -423,6 +220,11 @@ def juju(request: pytest.FixtureRequest) -> Generator[jubilant.Juju, None, None]
     """Pytest fixture that wraps :meth:`jubilant.with_model`."""
 
     def show_debug_log(juju: jubilant.Juju):
+        """Show the juju debug log after the tests.
+
+        Args:
+            juju: The Juju instance to get the log from.
+        """
         if request.session.testsfailed:
             log = juju.debug_log(limit=1000)
             print(log, end="")
@@ -456,8 +258,9 @@ def minio_app_name_fixture() -> str:
 
 @pytest.fixture(scope="module", name="minio_app")
 def minio_app_fixture(juju: jubilant.Juju, minio_app_name, s3_netbox_credentials):
-    """Deploy and set up minio and s3-integrator needed for s3-like storage backend in the HA charms."""
-
+    """Deploy and set up minio and s3-integrator needed for s3-like storage backend
+    in the HA charms.
+    """
     if juju.status().apps.get(minio_app_name):
         logger.info(f"{minio_app_name} already deployed")
         return App(minio_app_name)
@@ -476,25 +279,21 @@ def minio_app_fixture(juju: jubilant.Juju, minio_app_name, s3_netbox_credentials
 
 @pytest.fixture(scope="module", name="nginx_app")
 def nginx_app_fixture(
-    juju: jubilant.Juju, 
+    juju: jubilant.Juju,
     nginx_app_name: str,
 ) -> App:
     """Deploy nginx."""
-
     if juju.status().apps.get(nginx_app_name):
         logger.info(f"{nginx_app_name} already deployed")
         return App(nginx_app_name)
-    
-    juju.deploy(
-        nginx_app_name,
-        channel="latest/edge",
-        revision=99,
-        trust=True)
+
+    juju.deploy(nginx_app_name, channel="latest/edge", revision=99, trust=True)
     return App(nginx_app_name)
+
 
 @pytest.fixture(scope="module", name="netbox_nginx_integration")
 def netbox_nginx_integration_fixture(
-    juju: jubilant.Juju, 
+    juju: jubilant.Juju,
     nginx_app: App,
     netbox_app: App,
     netbox_hostname: str,
@@ -514,54 +313,34 @@ def netbox_nginx_integration_fixture(
             logger.info("Relation already exists")
         else:
             raise
-    # status = juju.status()
-    # if not status.apps.get("self-signed-certificates"):
-    #     juju.deploy(
-    #         "self-signed-certificates",
-    #         channel="latest/edge",
-    #         trust=True,
-    #     )
-    # juju.wait(
-    #     jubilant.all_active,
-    #     timeout=20 * 60,
-    # )
-    # try:
-    #     juju.integrate(
-    #         f"{nginx_app.name}:certificates",
-    #         "self-signed-certificates",
-    #     )
-    # except jubilant.CLIError as e:
-    #     if "already exists" in str(e):
-    #         logger.info("Relation already exists")
-    #     else:
-    #         raise
     juju.wait(
         jubilant.all_active,
         timeout=15 * 60,
     )
     yield netbox_app
-    # juju.remove_relation(
-    #     f"{netbox_app.name}:ingress",
-    #     f"{nginx_app.name}:ingress",
-    # )
-    # juju.remove_application("self-signed-certificates")
+    juju.remove_relation(
+        f"{netbox_app.name}:ingress",
+        f"{nginx_app.name}:ingress",
+    )
+
 
 @pytest.fixture(scope="module", name="s3_integrator_app")
 def s3_integrator_app_fixture(
     juju: jubilant.Juju,
-    minio_app: App, 
+    minio_app: App,
+    s3_integrator_app_name: str,
     s3_netbox_configuration: dict,
-    s3_netbox_credentials: dict,) -> App:
-    s3_integrator = "s3-integrator"
-    if juju.status().apps.get(s3_integrator):
-        logger.info(f"{s3_integrator} already deployed")
-        return App(s3_integrator)
+    s3_netbox_credentials: dict,
+) -> App:
+    if juju.status().apps.get(s3_integrator_app_name):
+        logger.info(f"{s3_integrator_app_name} already deployed")
+        return App(s3_integrator_app_name)
     juju.deploy(
-        s3_integrator,
+        s3_integrator_app_name,
         channel="edge",
     )
     juju.wait(
-        lambda status: jubilant.all_blocked(status, s3_integrator),
+        lambda status: jubilant.all_blocked(status, s3_integrator_app_name),
         timeout=120,
     )
     status = juju.status()
@@ -586,9 +365,9 @@ def s3_integrator_app_fixture(
         s3_netbox_configuration,
     )
 
-    task = juju.run(f"{s3_integrator}/0", "sync-s3-credentials", s3_netbox_credentials)
+    task = juju.run(f"{s3_integrator_app_name}/0", "sync-s3-credentials", s3_netbox_credentials)
     assert task.status == "completed"
-    return App(s3_integrator)
+    return App(s3_integrator_app_name)
 
 
 @pytest.fixture(scope="module", name="postgresql_app")
@@ -597,7 +376,6 @@ def postgresql_app_fixture(
     postgresql_app_name: str,
 ):
     """Deploy and set up postgresql charm needed for the 12-factor charm."""
-
     if juju.status().apps.get(postgresql_app_name):
         logger.info(f"{postgresql_app_name} already deployed")
         return App(postgresql_app_name)
@@ -610,13 +388,13 @@ def postgresql_app_fixture(
     )
     return App(postgresql_app_name)
 
+
 @pytest.fixture(scope="module", name="redis_app")
 def redis_app_fixture(
     juju: jubilant.Juju,
     redis_app_name: str,
 ):
     """Deploy and set up postgresql charm needed for the 12-factor charm."""
-
     if juju.status().apps.get(redis_app_name):
         logger.info(f"{redis_app_name} already deployed")
         return App(redis_app_name)
@@ -626,6 +404,7 @@ def redis_app_fixture(
         channel="edge",
     )
     return App(redis_app_name)
+
 
 @pytest.fixture(scope="module", name="netbox_app")
 def netbox_app_fixture(
@@ -666,12 +445,10 @@ def netbox_app_fixture(
         f"{netbox_app_name}:redis",
         f"{redis_app.name}",
     )
-    # juju.integrate(
-    #     f"{netbox_app_name}:ingress",
-    #     f"{netbox_nginx_integration.name}",
-    # )
     juju.wait(
-        lambda status: jubilant.all_active(status, s3_integrator_app.name,postgresql_app.name, redis_app.name, netbox_app_name),
+        lambda status: jubilant.all_active(
+            status, s3_integrator_app.name, postgresql_app.name, redis_app.name, netbox_app_name
+        ),
         timeout=15 * 60,
     )
 
